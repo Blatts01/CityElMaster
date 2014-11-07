@@ -1,6 +1,6 @@
 #ifndef CANINTERFACE_H
 #define CANINTERFACE_H
-
+#include "can_drv.h"
 #include <QObject>
 
 class CanInterface : public QObject
@@ -12,8 +12,7 @@ public:
 
 private:
     explicit CanInterface(QObject *parent = 0);
-    ~CanInterface();
-    static CanInterface* _instance;
+    static CanInterface* m_instance;
 
 public:
     bool startCanInterface();
@@ -29,6 +28,12 @@ private:
     void initEvents();
     static bool openCanDevice();
     static bool readConfigFile();
+
+    static bool m_canDeviceOnline;
+    static bool m_canOnline;
+    static u_int16_t m_canSpeed;
+    static const u_int32_t m_index;
+    static const QByteArray m_libPath;
 
 public slots:
     bool sendMessage(quint32 txIdent, QByteArray txData);

@@ -1,18 +1,25 @@
 #include "caninterface.h"
 
+
+CanInterface* CanInterface::m_instance = NULL;
+
+u_int16_t CanInterface::m_canSpeed = 125;
+const u_int32_t CanInterface::m_index = 0;
+bool CanInterface::m_canDeviceOnline = false;
+bool CanInterface::m_canOnline = false;
+const QByteArray CanInterface::m_libPath = "../libmhstcan.so";
+
+
 CanInterface::CanInterface(QObject *parent) :
     QObject(parent)
 {
 }
 bool CanInterface::startCanInterface()
 {
-    //* Beschreibung *
-    //*  Enthält die Funktionen und Fehlerbehandlung zum Starten des
-    //*  CAN-Interfaces.
 
     bool success = false;
 
-    // Lade Can/API Treiber
+
     if (loadCanDriver() == false)
     {
         // Fehlerbehandlung
@@ -30,7 +37,7 @@ bool CanInterface::startCanInterface()
     initEvents();
 
     // Setze CAN-Speed
-    CanSetSpeed(_index, _canSpeed);
+    CanSetSpeed(m_index, m_canSpeed);
 
     // Setze AutoConnect
     CanSetOptions("AutoConnect=1");
@@ -49,90 +56,90 @@ bool CanInterface::startCanInterface()
     }
     return success = true;
 }
-bool CanHandler::getCanOnline()
+bool CanInterface::getCanOnline()
 {
-    return _canOnline;
+    return m_canOnline;
 }
 
-int CanHandler::getCanSpeed()
+int CanInterface::getCanSpeed()
 {
-    return _canSpeed;
+    return m_canSpeed;
 }
 
-bool CanHandler::startCanBus()
+bool CanInterface::startCanBus()
 {
     int32_t ret = 0;
     bool success = false;
 
-    ret = CanSetMode(_index, OP_CAN_START, CAN_CMD_ALL_CLEAR);
+    ret = CanSetMode(m_index, OP_CAN_START, CAN_CMD_ALL_CLEAR);
 
     if (ret < 0)
     {
         // Setze Fehlermeldung ab
-        _canOnline = false;
+        m_canOnline = false;
         success = false;
     }
     else
     {
         // _canOnline nur setzen, wenn TinyCan angeschlossen
-        if (_canDeviceOnline)
+        if (m_canDeviceOnline)
         {
-            _canOnline = true;
+            m_canOnline = true;
         }
         success = true;
     }
     return success;
 }
 
-bool CanHandler::resetCanBus()
+bool CanInterface::resetCanBus()
 {
     //* Beschreibung *
     //*  Resetet den CAN-Bus und löscht alle Fehlerflags
 
     int32_t ret = 0;
-    ret = CanSetMode(_index, OP_CAN_RESET, CAN_CMD_ALL_CLEAR);
+    ret = CanSetMode(m_index, OP_CAN_RESET, CAN_CMD_ALL_CLEAR);
 
     if (ret < 0)
     {
-        _canOnline = false;
+        m_canOnline = false;
         return false;
     }
     else
     {
         // _canOnline nur setzen, wenn TinyCan angeschlossen
-        if (_canDeviceOnline)
+        if (m_canDeviceOnline)
         {
-            _canOnline = true;
+            m_canOnline = true;
         }
         return true;
     }
 }
 
-bool CanHandler::stopCanBus()
+bool CanInterface::stopCanBus()
 {
     //* Beschreibung *
     //*  Stoppt den CanBus
 
     int32_t ret = 0;
-    ret = CanSetMode(_index, OP_CAN_STOP, CAN_CMD_ALL_CLEAR);
+    ret = CanSetMode(m_index, OP_CAN_STOP, CAN_CMD_ALL_CLEAR);
 
     if (ret < 0)
     {
-        _canOnline = false;
+        m_canOnline = false;
         return false;
     }
     else
     {
         // _canOnline nur setzen, wenn TinyCan angeschlossen
-        if (_canDeviceOnline)
+        if (m_canDeviceOnline)
         {
-            _canOnline = false;
+            m_canOnline = false;
         }
         return true;
     }
 }
 
-bool CanHandler::loadCanDriver()
+bool CanInterface::loadCanDriver()
 {
     //* Beschreibung *
     //*  Ladet den Tiny-Can Treiber
@@ -143,7 +150,7 @@ bool CanHandler::loadCanDriver()
     // Bei compile für RasPi muss eine andere Lib verwendet werden.
     // Define für RASPICONST geschieht in .pro Datei
     // Methode ladet die Lib und initialisiert den Treiber.
-    ret = LoadDriver(_libPathARM.data());
+    ret = LoadDriver(m_libPath.data());
 
     // Fehlerbehandlung
     if (ret < 0)
@@ -158,7 +165,7 @@ bool CanHandler::loadCanDriver()
     return success;
 }
 
-bool CanHandler::initCanDriver()
+bool CanInterface::initCanDriver()
 {
     //* Beschreibung *
     //*  Initialisiert den CAN-Treiber
@@ -181,21 +188,19 @@ bool CanHandler::initCanDriver()
     return success;
 }
 
-void CanHandler::initEvents()
+void CanInterface::initEvents()
 {
     //* Beschreibung *
     //*  Setzt die Event-Funktionen und schaltet die Events frei.
 
     // Event Funktionen setzen
-    CanSetPnPEventCallback(&canPnPEvent);
-    CanSetStatusEventCallback(&canStatusEvent);
     CanSetRxEventCallback(&canRxEvent);
 
     // Alle Events freigeben
     CanSetEvents(EVENT_ENABLE_ALL);
 }
 
-bool CanHandler::openCanDevice()
+bool CanInterface::openCanDevice()
 {
     //* Beschreibung *
     //*  Öffnet das TinyCanDevice
@@ -203,24 +208,23 @@ bool CanHandler::openCanDevice()
     int32_t ret = 0;
     bool success = false;
 
-    ret = CanDeviceOpen(_index, NULL);
+    ret = CanDeviceOpen(m_index, NULL);
 
     if (ret < 0)
     {
         // Setze Fehlermeldung ab
-        createErrorMsg(ret, "openCanDevice()");
         success = false;
     }
     else
     {
-        _canDeviceOnline = true;
+        m_canDeviceOnline = true;
         success = true;
     }
     return success;
 }
 
 
-bool CanHandler::sendMessage(quint32 txIdent, QByteArray txData)
+bool CanInterface::sendMessage(quint32 txIdent, QByteArray txData)
 {
     //* Beschreibung *
     //*  Sendet die übergebene Nachricht mit dem übergebenen Identifier per CAN raus.
@@ -232,33 +236,27 @@ bool CanHandler::sendMessage(quint32 txIdent, QByteArray txData)
 
     message.MsgFlags = 0L; // Setze Flags zurück
 
-    // Bei Extended-Frame-Format
-    if (_enableEFF)
-    {
-        message.Flags.Flag.EFF = 1; // Setze EFF-Flag
-    }
+//    // Bei Extended-Frame-Format
+//    if (m_enableEFF)
+//    {
+//        message.Flags.Flag.EFF = 1; // Setze EFF-Flag
+//    }
 
     // Identifier darf bei Basis-Frame-Format nur 11 Bit haben
-    if (txIdent < 2048 && !_enableEFF)
+    if (txIdent < 2048 /*&& !m_enableEFF*/)
     {
         message.Id = (u_int32_t)txIdent;
     }
-    // Identifier darf bei Extended-Frame-Format nur 29 Bit haben
-    else if (txIdent < 536870912)
-    {
-        message.Id = (u_int32_t)txIdent;
-    }
-    // Error: Identifier zu groß
-    else
-    {
-        QObject sender;
-        sender.setObjectName(_objectName);
-        QString errMsg = "";
-        errMsg.append("Identifier: ").append(QString("%1").arg(txIdent)).append(" out of Range!");
-        _errorHandle->newMessage(&sender, "sendMessage()", "Error", errMsg, _errorLevel);
-
-        return success = false;
-    }
+//    // Identifier darf bei Extended-Frame-Format nur 29 Bit haben
+//    else if (txIdent < 536870912)
+//    {
+//        message.Id = (u_int32_t)txIdent;
+//    }
+//    // Error: Identifier zu groß
+//    else
+//    {
+//        return success = false;
+//    }
 
     // Schreibe Größe der Daten, wenn es max. 8 Byte sind
     if (txData.size() <= 8)
@@ -268,12 +266,6 @@ bool CanHandler::sendMessage(quint32 txIdent, QByteArray txData)
     // Daten größer als 8 Byte -> return
     else
     {
-        QObject sender;
-        sender.setObjectName(_objectName);
-        QString errMsg = "";
-        errMsg.append("Data from Identifier: ").append(QString("%1").arg(txIdent)).append(" more than 8 Byte! Message not send!");
-        _errorHandle->newMessage(&sender, "sendMessage()", "Error", errMsg, _errorLevel);
-
         return success = false;
     }
 
@@ -289,40 +281,28 @@ bool CanHandler::sendMessage(quint32 txIdent, QByteArray txData)
     memcpy(message.MsgData, txDataMirrored.constData(), txDataMirrored.size());
 
     // Wenn CAN Online -> Nachricht versenden
-    if (_canOnline)
+    if (m_canOnline)
     {
         int32_t ret = 0;
 
-        ret = CanTransmit(_index, &message, 1);
+        ret = CanTransmit(m_index, &message, 1);
 
         // Fehlerbehandlung
         if (ret < 0)
         {
             // Hole Fehlerbeschreibung und setzte Fehlermeldung ab
-            createErrorMsg(ret, "sendMessage()");
             success = false;
         }
         else
         {
-            QObject sender;
-            sender.setObjectName(_objectName);
-            QString errMsg = "";
-            errMsg.append("Send CAN-Message with Ident: ")
-                  .append(QString("%1").arg(txIdent))
-                  .append(" with Data: ")
-                  .append(txData.toHex());
-            _errorHandle->newMessage(&sender, "sendMessage()", "Warning", errMsg, _ioLevel);
+
             success = true;
         }
     }
     // CAN Offline -> Fehlermeldung
     else
     {
-        QObject sender;
-        sender.setObjectName(_objectName);
-        QString errMsg = "";
-        errMsg.append("Can't send CAN-Message with Ident: ").append(QString("%1").arg(txIdent)).append(" ! CAN Bus offline!");
-        _errorHandle->newMessage(&sender, "sendMessage()", "Error", errMsg, _errorLevel);
+
     }
 
     return success;
@@ -330,7 +310,7 @@ bool CanHandler::sendMessage(quint32 txIdent, QByteArray txData)
 
 
 
-void CanHandler::canRxEvent(u_int32_t index, TCanMsg *msg, int32_t count)
+void CanInterface::canRxEvent(u_int32_t index, TCanMsg *msg, int32_t count)
 {
     //* Beschreibung *
     //*  Callback-Methode wird beim Empfang einer Nachricht aufgerufen.
@@ -365,14 +345,6 @@ void CanHandler::canRxEvent(u_int32_t index, TCanMsg *msg, int32_t count)
         // Verwendet Extended-Frame-Format -> verwerfen
         if (message.Flags.Flag.EFF)
         {
-            QObject sender;
-            sender.setObjectName(_objectName);
-            QString debugMsg = "";
-            debugMsg.append("CAN-Message from Ident: ")
-                    .append(QString("%1").arg(rxIdent))
-                    .append(" uses Extended-Frame-Format! Message discarded!");
-            _errorHandle->newMessage(&sender, "canRxEvent()", "Warning", debugMsg, _debugLevel);
-
             // Lese nächste Nachricht
             continue;
         }
@@ -392,29 +364,11 @@ void CanHandler::canRxEvent(u_int32_t index, TCanMsg *msg, int32_t count)
         // Leere Nachricht -> verwerfen
         else
         {
-            QObject sender;
-            sender.setObjectName(_objectName);
-            QString debugMsg = "";
-            debugMsg.append("CAN-Message from Ident: ")
-                    .append(QString("%1").arg(rxIdent))
-                    .append(" contains no Data! Message discarded!");
-            _errorHandle->newMessage(&sender, "canRxEvent()", "Warning", debugMsg, _debugLevel);
-
             // Lese nächste Nachricht
             continue;
         }
-
-        QObject sender;
-        sender.setObjectName(_objectName);
-        QString errMsg = "";
-        errMsg.append("New CAN-Message from Ident: ")
-              .append(QString("%1").arg(rxIdent))
-              .append(" with Data: ")
-              .append(rxData.toHex());
-        _errorHandle->newMessage(&sender, "canRxEvent()", "Warning", errMsg, _ioLevel);
-
         // Versende Signal mit Daten
         // Quelle: http://stackoverflow.com/questions/9411153/sending-signal-from-static-class-method-in-qt
-        emit _instance->newMessage(rxIdent, rxData);
+        emit m_instance->newMessage(rxIdent, rxData);
     }
 }
